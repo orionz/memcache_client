@@ -1,0 +1,5 @@
+Clean up the open semantics.  they are broken
+Recover from broken connections
+binary norespond
+Multi-Get
+Binary Increment/Decrement Start+Delta

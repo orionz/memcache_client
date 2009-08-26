@@ -1,0 +1,78 @@
+----------------------------------------
+
+  Memcache Client in Erlang
+
+----------------------------------------
+
+This is a memcache client for erlang.  It is currently very much just a proof
+of concept.  The interface I am sure will change over time as I get a better
+and better handle on what the user experience is supposed to look like.
+
+I have implemented both the binary protocol (very easy in Erlang!) and the
+conventional text one.  The binary protocol appears to be much faster and 
+have a lot of nice features missing in the text protocol but you must be
+running memcache 1.4 or higher to have it supported in the server.
+
+Given that the binary protocol is both faster, and the future, my focus has been
+to make a first class implementation of the binary protocol and then try and 
+coerce the text interface to work with it.
+
+Use:
+
+  % this connects to localhost:11211 using the text protocol
+  Cache = memcache:open() 
+
+  % this connects to 10.0.0.1:11211 using the text protocol
+  Cache = memcache:open("10.0.0.1") 
+
+  % this connects to 10.0.0.1:9999 using the text protocol
+  Cache = memcache:open("10.0.0.1",9999) 
+
+  % this connects to 10.0.0.1:9999 using the binary protocol
+  Cache = memcache:open(binary,"10.0.0.1",9999) 
+
+  % this connects to both 127.0.0.1:11211 and 10.0.0.1:9999 using the binary protocol
+  Cache = memcache:open(binary,[ "127.0.0.1" , { "10.0.0.1",9999 } ]) 
+
+  % it is possible to have a heterogenius mix of binary and text connections
+  % but I have not writen a function for doing that
+
+  memcache:set(Cache, Key, Value).
+  memcache:set(Cache, Key, Value, Flags, Expire).
+
+  memcache:add(Cache, Key, Value).
+  memcache:add(Cache, Key, Value, Flags, Expire).
+
+  memcache:replace(Cache, Key, Value).
+  memcache:replace(Cache, Key, Value, Flag, Expire).
+
+  memcache:append(Cache, Key, Value).
+  memcache:prepend(Cache, Key, Value).
+
+  memcache:get(Cache, Key).
+  memcache:getk(Cache, Key).
+
+  memcache:increment(Cache, Key, Delta).
+  memcache:decrement(Cache, Key, Delta).
+
+  memcache:delete(Cache, Key).
+
+  memcache:quit(Cache).
+
+  memcache:flush(Cache).
+  memcache:flush(Cache, Expires).
+
+  memcache:noop(Cache).
+
+  memcache:version(Cache).
+
+  memcache:stat(Cache).
+  memcache:stat(Cache, Key).
+
+Binary Protocol:
+
+  http://code.google.com/p/memcached/wiki/MemcacheBinaryProtocol
+
+Text Protocol:
+
+  http://code.sixapart.com/svn/memcached/trunk/server/doc/protocol.txt
