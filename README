@@ -1,8 +1,19 @@
-----------------------------------------
+---------------------------------------------------------------------------
 
   Memcache Client in Erlang
 
-----------------------------------------
+---------------------------------------------------------------------------
+
+  Author: Orion Henry - orion@heroku.com
+
+  License: MIT License - http://www.opensource.org/licenses/mit-license.php
+
+  Features:
+    * text/tcp protocol support
+    * binary/tcp protocol support
+    * hash keys across multiple (heterogeneous) servers
+
+---------------------------------------------------------------------------
 
 This is a memcache client for erlang.  It is currently very much just a proof
 of concept.  The interface I am sure will change over time as I get a better

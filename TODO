@@ -3,3 +3,6 @@ Recover from broken connections
 binary norespond
 Multi-Get
 Binary Increment/Decrement Start+Delta
+erlang terms
+name project
+fix the readline()
