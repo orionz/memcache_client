@@ -14,51 +14,17 @@
 -export([disconnect/3]).
 -export([connect/4]).
 
--define(GET, 0).
--define(SET, 1).
--define(ADD, 2).
--define(REPLACE, 3).
--define(DELETE, 4).
--define(INCREMENT, 5).
--define(DECREMENT, 6).
--define(QUIT, 7).
--define(FLUSH, 8).
--define(GETQ, 9).
--define(NOOP, 10).
--define(VERSION, 11).
--define(GETK, 12).
--define(GETKQ, 13).
--define(APPEND, 14).
--define(PREPEND, 15).
--define(STAT, 16).
-
-%   0x00    Get
-%   0x01    Set
-%   0x02    Add
-%   0x03    Replace
-%   0x04    Delete
-%   0x05    Increment
-%   0x06    Decrement
-%   0x07    Quit
-%   0x08    Flush
-%   0x09    GetQ
-%   0x0A    No-op
-%   0x0B    Version
-%   0x0C    GetK
-%   0x0D    GetKQ
-%   0x0E    Append
-%   0x0F    Prepend
-%   0x10    Stat
-
 start() ->
   spawn(memcache_cluster,loop,[{ [], cache_hash:empty()}]).
 
 loop(Cons) when is_tuple(Cons) ->
   receive
     { raw , Pid, Opcode, Key, Data } ->
+%      io:format("GOT RAW ~p,~p,~p~n",[Opcode,Key,Data]),
       Pid ! { raw_response, raw( Cons, Opcode, Key, Data) },
       loop(Cons);
     { request, Pid, Request } ->
+%      io:format("GOT REQUEST ~p,~p~n",[Pid,Request]),
       Pid ! { response, request( Cons, Request) },
       loop(Cons);
     { disconnect, Ip, Port } ->

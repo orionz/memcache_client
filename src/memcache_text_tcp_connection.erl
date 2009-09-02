@@ -7,24 +7,6 @@
 -export([]).
 -export([send_request/1, raw/1 ]).
 
--define(GET, 0).
--define(SET, 1).
--define(ADD, 2).
--define(REPLACE, 3).
--define(DELETE, 4).
--define(INCREMENT, 5).
--define(DECREMENT, 6).
--define(QUIT, 7).
--define(FLUSH, 8).
--define(GETQ, 9).
--define(NOOP, 10).
--define(VERSION, 11).
--define(GETK, 12).
--define(GETKQ, 13).
--define(APPEND, 14).
--define(PREPEND, 15).
--define(STAT, 16).
-
 send_request(R) ->
   write(R).
 
@@ -52,21 +34,6 @@ words(Line) ->
 read_words() ->
   words(read_line()).
 
-write(_R=#request{ opcode=?VERSION }) ->
-  send("version\r\n"),
-  case read_words() of
-    [ "VERSION", V ] -> { ok, [ list_to_binary(V), 0, 0 ,0 ] };
-    Error -> { error, Error }
-  end;
-write(_R=#request{ opcode=?STAT }) ->
-  send("stats\r\n"),
-  read_stats([]);
-write(R=#request{ opcode=?FLUSH }) ->
-  send(["flush_all ", integer_to_list(R#request.expires), "\r\n"]),
-  case read_line() of
-    "OK" -> { ok, [ 0, 0, 0, 0 ] };
-    Error -> { error, Error }
-  end;
 write(R=#request{ opcode=?GET }) ->
   base_get(R);
 write(R=#request{ opcode=?GETK }) ->
@@ -100,7 +67,48 @@ write(R=#request{ opcode=?DELETE }) ->
   case read_line() of
     "DELETED"  -> { ok , [ 0, 0, 0, 0] };
     "NOT_FOUND" -> { error, key_not_found }
-  end.
+  end;
+write(R=#request{ opcode=?SETQ }) when R#request.cas > 0 ->
+  base_setq("cas",R);
+write(R=#request{ opcode=?SETQ }) ->
+  base_setq("set",R);
+write(R=#request{ opcode=?REPLACEQ }) ->
+  base_setq("replace",R);
+write(R=#request{ opcode=?ADDQ }) ->
+  base_setq("add",R);
+write(R=#request{ opcode=?APPENDQ }) ->
+  base_setq("append",R);
+write(R=#request{ opcode=?PREPENDQ }) ->
+  base_setq("prepend",R);
+write(R=#request{ opcode=?INCREMENTQ }) ->
+  send(["incr ", R#request.key, " ", integer_to_list(R#request.delta), " noreply\r\n"]);
+write(R=#request{ opcode=?DECREMENTQ }) ->
+  send(["decr ", R#request.key, " ", integer_to_list(R#request.delta), " noreply\r\n"]);
+write(R=#request{ opcode=?DELETEQ }) ->
+  send(["delete ", R#request.key, " noreply\r\n"]);
+write(R=#request{ opcode=?FLUSHQ }) ->
+  send(["flush_all ", integer_to_list(R#request.expires), " noreply\r\n"]);
+write(_R=#request{ opcode=?VERSION }) ->
+  send("version\r\n"),
+  case read_words() of
+    [ "VERSION", V ] -> { ok, [ list_to_binary(V), 0, 0 ,0 ] };
+    Error -> { error, Error }
+  end;
+write(_R=#request{ opcode=?STAT }) ->
+  send("stats\r\n"),
+  read_stats([]);
+write(R=#request{ opcode=?FLUSH }) ->
+  send(["flush_all ", integer_to_list(R#request.expires), "\r\n"]),
+  case read_line() of
+    "OK" -> { ok, [ 0, 0, 0, 0 ] };
+    Error -> { error, Error }
+  end;
+write(_R=#request{ opcode=?QUITQ }) ->
+  send("quit\r\n"),
+  exit(normal);
+write(_R=#request{ opcode=?QUIT }) ->
+  send("quit\r\n"),
+  exit(normal).
 
 base_get(R) ->
   send(["gets ", R#request.key, "\r\n"]),
@@ -114,6 +122,9 @@ base_get(R) ->
     [ "END" ] ->
       { error, key_not_found }
   end.
+
+base_setq(Cmd,R) ->
+  send([Cmd, " ", R#request.key, " ", integer_to_list(R#request.flags), " ", integer_to_list(R#request.expires), " ", integer_to_list(l(R#request.value)), cas_text(Cmd,R)," noreply\r\n", R#request.value, "\r\n"]).
 
 base_set(Cmd,R) ->
   %% this needs to send the cas value, duh

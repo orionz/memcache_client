@@ -53,6 +53,97 @@ test(C,TestName) ->
   io:format("set -> ok~n"),    memcache:set(C,"KEY009","v1"),
   io:format("get -> value~n"), { ok, <<"v1">>, _, _} = memcache:get(C,"KEY009"),
 
+  io:format("NOREPLY BATTERY --- ~n"),
+
+  memcache:flushq(C),
+
+  io:format("get -> key_not_found~n"),
+  {error, key_not_found} = memcache:get(C,"k1"),
+
+  io:format("setq -> ok~n"),    memcache:setq(C,"KEY001","v1"),
+  io:format("get -> value~n"),  X1 = memcache:get(C,"KEY001"),
+  io:format("X1 ~p~n",[X1]),
+  io:format("get -> value~n"),  X2 = memcache:get(C,"KEY001"),
+  io:format("X2 ~p~n",[X2]),
+  io:format("get -> value~n"), { ok, <<"v1">>, _, _} = memcache:get(C,"KEY001"),
+  io:format("setq -> ok~n"),    memcache:setq(C,"KEY002","v1"),
+  io:format("get -> value~n"), { ok, <<"v1">>, _, _} = memcache:get(C,"KEY002"),
+
+  io:format("setq -> ok~n"),
+  ok = memcache:setq(C,"k1","v1"),
+
+  io:format("get -> value~n"),
+  { ok, <<"v1">>, _, _} = memcache:get(C,"k1"),
+
+  io:format("deleteq -> ok~n"),
+  ok = memcache:deleteq(C,"k1"),
+
+  io:format("get -> key_not_found~n"),
+  {error, key_not_found} = memcache:get(C,"k1"),
+
+  io:format("replaceq -> key_not_found / item_not_stored~n"), % difference between bin/text
+  ok = memcache:replaceq(C,"k1","v2"),
+
+  io:format("get -> key_not_found~n"),
+  {error,key_not_found} = memcache:get(C,"k1"),
+
+  io:format("addq -> ok~n"),
+  ok = memcache:addq(C,"k1","v3"),
+
+  io:format("get -> ok~n"),
+  { ok, <<"v3">>, _, _ } = memcache:get(C,"k1"),
+
+  io:format("replaceq -> ok~n"),
+  ok = memcache:replaceq(C,"k1","v4"),
+
+  io:format("get -> ok~n"),
+  { ok, <<"v4">>, _, _ } = memcache:get(C,"k1"),
+
+  io:format("addq -> key_exists/item_not_stored~n"), % difference between bin/text
+  ok = memcache:addq(C,"k1","v5"),
+
+  io:format("get -> ok~n"),
+  { ok, <<"v4">>, _, Cas } = memcache:get(C,"k1"),
+
+  io:format("casq v4.1/~p -> ok~n",[Cas]),
+  ok = memcache:casq(C,"k1","v4.1",Cas),
+
+  io:format("casq v4.2/~p -> ok~n",[Cas]),
+  ok = memcache:casq(C,"k1","v4.2",Cas),
+
+  io:format("get -> ok~n"),
+  { ok, <<"v4.1">>, _, _ } = memcache:get(C,"k1"),
+
+  io:format("setq -> ok~n"),
+  memcache:setq(C,"k1","00"),
+
+  io:format("appendq -> ok~n"),
+  ok = memcache:appendq(C,"k1","zzz"),
+
+  io:format("prependq -> ok~n"),
+  ok = memcache:prependq(C,"k1","aaa"),
+
+  io:format("get -> ok~n"),
+  { ok, <<"aaa00zzz">>, _, _ } = memcache:get(C,"k1"),
+
+  memcache:deleteq(C,"III"), %% if we dont flush I have to do this...
+
+  io:format("addq -> ok~n"),
+  ok = memcache:addq(C,"III","100"),
+
+  io:format("incrementq -> ok~n"),
+  ok = memcache:incrementq(C,"III",10),
+
+  io:format("decrement -> ok~n"),
+  ok = memcache:decrementq(C,"III",5),
+
+  io:format("get -> ok~n"),
+  { ok, <<"105">>, _, _ } = memcache:get(C,"III"),
+
+  ok = memcache:flushq(C),
+
+  io:format("NORMAL BATTERY --- ~n"),
+
   io:format("set -> ok~n"),
   memcache:set(C,"k1","v1"),
   %io:format("set -> ~s~n",[X]),
@@ -80,7 +171,7 @@ test(C,TestName) ->
   io:format("add -> ok~n"),
   { ok, _ } = memcache:add(C,"k1","v3"),
 
-  io:format("get -> ok~n"),
+  io:format("get -> /v3/ ok~n"),
   { ok, <<"v3">>, _, _ } = memcache:get(C,"k1"),
 
   io:format("replace -> ok~n"),
@@ -92,16 +183,17 @@ test(C,TestName) ->
   io:format("add -> key_exists/item_not_stored~n"), % difference between bin/text
   {error,_} = memcache:add(C,"k1","v5"),
 
-  io:format("get -> ok~n"),
-  { ok, <<"v4">>, _, Cas } = memcache:get(C,"k1"),
+  X = memcache:get(C,"k1"),
+  io:format("get -> ~p~n",[X]),
+  { ok, <<"v4">>, _, Cas2 } = memcache:get(C,"k1"),
 
-  io:format("cas v4.1/~p -> ok~n",[Cas]),
-  { ok, _ } = memcache:cas(C,"k1","v4.1",Cas),
+  io:format("cas v4.1/~p -> ok~n",[Cas2]),
+  { ok, _ } = memcache:cas(C,"k1","v4.1",Cas2),
 
-  io:format("cas v4.2/~p -> ok~n",[Cas]),
-  {error,key_exists} = memcache:cas(C,"k1","v4.2",Cas),
+  io:format("cas v4.2/~p -> ok~n",[Cas2]),
+  {error,key_exists} = memcache:cas(C,"k1","v4.2",Cas2),
 
-  io:format("get -> ok~n"),
+  io:format("get -> ok - v4.1~n"),
   { ok, <<"v4.1">>, _, _ } = memcache:get(C,"k1"),
 
   io:format("flush -> ok~n"),

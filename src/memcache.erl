@@ -4,11 +4,15 @@
 -export([new/0,connect/3,disconnect/2,close/1]).
 
 -export([add/3,add/5,replace/3,replace/5,set/3,set/5,set/6,cas/4,cas/6]).
+-export([addq/3,addq/5,replaceq/3,replaceq/5,setq/3,setq/5,setq/6,casq/4,casq/6]).
 -export([get/2,getk/2]).
 -export([delete/2,quit/1,flush/1,flush/2,noop/1,version/1,stat/1]).
+-export([deleteq/2,quitq/1,flushq/1,flushq/2]).
 -export([raw/4]).
 -export([append/3,prepend/3]).
+-export([appendq/3,prependq/3]).
 -export([increment/3,decrement/3]).
+-export([incrementq/3,decrementq/3]).
 
 %-define(TCP_BINARY_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
 %-define(TCP_TEXT_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
@@ -16,26 +20,7 @@
 -include_lib("memcache.hrl").
 
 -define(DEFAULT_OPTIONS, [text]).
--define(DEFAULT_IP, "127.0.0.1").
--define(DEFAULT_PORT, 11211).
-
--define(GET, 0).
--define(SET, 1).
--define(ADD, 2).
--define(REPLACE, 3).
--define(DELETE, 4).
--define(INCREMENT, 5).
--define(DECREMENT, 6).
--define(QUIT, 7).
--define(FLUSH, 8).
--define(GETQ, 9).
--define(NOOP, 10).
--define(VERSION, 11).
--define(GETK, 12).
--define(GETKQ, 13).
--define(APPEND, 14).
--define(PREPEND, 15).
--define(STAT, 16).
+-define(DEFAULT_HOSTS, [ {"127.0.0.1", 11211 } ]).
 
 %   0x00    Get
 %   0x01    Set
@@ -59,7 +44,7 @@ new() ->
   memcache_cluster:start().
 
 open() ->
-  open( [ { ?DEFAULT_IP, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS ).
+  open( ?DEFAULT_HOSTS, ?DEFAULT_OPTIONS ).
 
 open(Host, Options) when is_tuple(Host) ->
   open([ Host ], Options);
@@ -93,24 +78,34 @@ request(Con, Request) ->
     { response, Response } -> Response
   end.
 
-%cas(Con, Key, Value, Cas) when is_integer(Cas) and Cas > 0 ->
 cas(Con, Key, Value, Cas) when is_integer(Cas) ->
   cas(Con, Key, Value, 0, 0, Cas).
 cas(Con, Key, Value, Flags, Expires, Cas) when is_integer(Cas) ->
   set(Con, Key, Value, Flags, Expires, Cas).
 
+casq(Con, Key, Value, Cas) when is_integer(Cas) ->
+  casq(Con, Key, Value, 0, 0, Cas).
+casq(Con, Key, Value, Flags, Expires, Cas) when is_integer(Cas) ->
+  setq(Con, Key, Value, Flags, Expires, Cas).
+
 set(Con, Key, Value) ->
-  set(Con, Key, Value, 0, 0, 0, false).
+  set(Con, Key, Value, 0, 0, 0).
 set(Con, Key, Value, Flags, Expires) ->
-  set(Con, Key, Value, Flags, Expires, 0, false).
+  set(Con, Key, Value, Flags, Expires, 0).
 set(Con, Key, Value, Flags, Expires, Cas) ->
-  set(Con, Key, Value, Flags, Expires, Cas, false).
-set(Con, Key, Value, Flags, Expires, Cas, Noreply) ->
-  case request( Con, #request{ opcode=?SET, key=Key, value=Value, flags=Flags, expires=Expires, cas=Cas, noreply=Noreply } ) of
+  case request( Con, #request{ opcode=?SET, key=Key, value=Value, flags=Flags, expires=Expires, cas=Cas } ) of
     ok -> ok;
     { ok, [ _, _, _, Cas2 ] } -> { ok, Cas2 };
     { error, Error } -> { error, Error }
   end.
+
+setq(Con, Key, Value) ->
+  setq(Con, Key, Value, 0, 0, 0).
+setq(Con, Key, Value, Flags, Expires) ->
+  setq(Con, Key, Value, Flags, Expires, 0).
+setq(Con, Key, Value, Flags, Expires, Cas) ->
+  request( Con, #request{ opcode=?SETQ, key=Key, value=Value, flags=Flags, expires=Expires, cas=Cas } ),
+  ok.
 
 add(Con, Key, Value) ->
   add(Con, Key, Value, 0, 0).
@@ -120,6 +115,12 @@ add(Con, Key, Value, Flags, Expires) ->
     { error, Error } -> { error, Error }
   end.
 
+addq(Con, Key, Value) ->
+  addq(Con, Key, Value, 0, 0).
+addq(Con, Key, Value, Flags, Expires) ->
+  request(Con, #request{ opcode=?ADDQ, key=Key, value=Value, flags=Flags, expires=Expires } ),
+  ok.
+
 replace(Con, Key, Value) ->
   replace(Con, Key, Value, 0, 0).
 replace(Con, Key, Value, Flags, Expires) ->
@@ -128,17 +129,31 @@ replace(Con, Key, Value, Flags, Expires) ->
     { error, Error } -> { error, Error }
   end.
 
+replaceq(Con, Key, Value) ->
+  replaceq(Con, Key, Value, 0, 0).
+replaceq(Con, Key, Value, Flags, Expires) ->
+  request( Con, #request{ opcode=?REPLACEQ, key=Key, value=Value, flags=Flags, expires=Expires } ),
+  ok.
+
 append(Con, Key, Value) ->
   case request( Con, #request{ opcode=?APPEND, key=Key, value=Value } ) of
     { ok, _ } -> ok;
     { error, Error } -> { error, Error }
   end.
 
+appendq(Con, Key, Value) ->
+  request( Con, #request{ opcode=?APPENDQ, key=Key, value=Value } ),
+  ok.
+
 prepend(Con, Key, Value) ->
   case request( Con, #request{ opcode=?PREPEND, key=Key, value=Value } ) of
     { ok, _ } -> ok;
     { error, Error } -> { error, Error }
   end.
+
+prependq(Con, Key, Value) ->
+  request( Con, #request{ opcode=?PREPENDQ, key=Key, value=Value } ),
+  ok.
 
 get(Con, Key) ->
   case request(Con, #request{ opcode=?GET, key=Key } ) of
@@ -153,18 +168,24 @@ getk(Con, Key) ->
   end.
 
 delete(Con, Key) ->
-  delete(Con, Key, false).
-delete(Con, Key, Noreply) ->
-  case request( Con, #request{ opcode=?DELETE, key=Key, noreply=Noreply } ) of
+  case request( Con, #request{ opcode=?DELETE, key=Key } ) of
     { ok, _ } -> ok;
     { error, Error } -> { error, Error }
   end.
+
+deleteq(Con, Key) ->
+  request( Con, #request{ opcode=?DELETEQ, key=Key } ),
+  ok.
 
 quit(Con) ->
   case request( Con, #request{ opcode=?QUIT } ) of
     { ok, _ } -> ok;
     { error, Error } -> { error, Error }
   end.
+
+quitq(Con) ->
+  request( Con, #request{ opcode=?QUITQ } ),
+  ok.
 
 raw(Con, Opcode, Key, Data) ->
   Con ! { raw, self(), Opcode, Key, Data },
@@ -184,6 +205,12 @@ flush(Con, Exp) ->
     ||
     Request <- request( Con, #request{ opcode=?FLUSH, expires=Exp } )
   ].
+
+flushq(Con) when is_pid(Con)->
+  flushq(Con, 0).
+flushq(Con, Exp) ->
+  request( Con, #request{ opcode=?FLUSHQ, expires=Exp } ),
+  ok.
 
 noop(Con) ->
   case request( Con, #request{ opcode=?NOOP } ) of
@@ -207,20 +234,25 @@ stat(Con) ->
 %% increment(Key,Delta,Initial,Expires) -> initial and expires is only on binary protocol
 %  case request( #request{ opcode=?INCREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
 increment(Con, Key, Delta) ->
-  increment(Con, Key, Delta, false).
-increment(Con, Key, Delta, Noreply) ->
-  case request( Con, #request{ opcode=?INCREMENT, key=Key, delta=Delta, noreply=Noreply } ) of
+  case request( Con, #request{ opcode=?INCREMENT, key=Key, delta=Delta } ) of
     { ok, [ <<Value:64>> | _ ] } -> { ok, Value };
     { error, Error } -> { error, Error }
   end.
 
+incrementq(Con, Key, Delta) ->
+  request( Con, #request{ opcode=?INCREMENTQ, key=Key, delta=Delta } ),
+  ok.
+
 %decrement(Key,Delta,Initial,Expires) ->
 %  case request( #request{ opcode=?DECREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
 decrement(Con, Key,Delta) ->
-  decrement(Con, Key, Delta, false).
-decrement(Con, Key,Delta, Noreply) ->
-  case request( Con, #request{ opcode=?DECREMENT, key=Key, delta=Delta, noreply=Noreply } ) of
+  case request( Con, #request{ opcode=?DECREMENT, key=Key, delta=Delta } ) of
     { ok, [ <<Value:64>> | _ ] } -> { ok, Value };
     { error, Error } -> { error, Error }
   end.
+
+decrementq(Con, Key,Delta) ->
+  request( Con, #request{ opcode=?DECREMENTQ, key=Key, delta=Delta } ),
+  ok.
+
 
