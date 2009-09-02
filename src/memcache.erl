@@ -1,6 +1,7 @@
 -module(memcache).
 
--export([open/0,open/1,open/2,open/3,open/4]).
+-export([open/0,open/2,open/3]).
+-export([new/0,connect/3,disconnect/2,close/1]).
 
 -export([add/3,add/5,replace/3,replace/5,set/3,set/5,set/6,cas/4,cas/6]).
 -export([get/2,getk/2]).
@@ -14,8 +15,7 @@
 
 -include_lib("memcache.hrl").
 
--define(DEFAULT_TYPE, text).
--define(DEFAULT_OPTIONS, []).
+-define(DEFAULT_OPTIONS, [text]).
 -define(DEFAULT_IP, "127.0.0.1").
 -define(DEFAULT_PORT, 11211).
 
@@ -55,33 +55,40 @@
 %   0x0F    Prepend
 %   0x10    Stat
 
+new() ->
+  memcache_cluster:start().
+	
 open() ->
-  open( ?DEFAULT_TYPE, [ { ?DEFAULT_IP, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS ).
+  open( [ { ?DEFAULT_IP, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS ).
 
-open( Type ) when is_atom(Type) ->
-  open( Type, [ { ?DEFAULT_IP, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS);
-open( Ip ) when is_list(Ip) ->
-  open( ?DEFAULT_TYPE, [ { Ip, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS).
+open(Host, Options) when is_tuple(Host) ->
+	open([ Host ], Options);
+open(Hosts, Options ) when is_list(Hosts) and is_list(Options) ->
+	memcache:open(memcache:new(), Hosts, Options).
 
-open( Type, Ip ) when is_atom(Type) and is_list(Ip) ->
-  open( Type, [ { Ip, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS);
-open( Ip, Port ) when is_list(Ip) and is_integer(Port) ->
-  open( ?DEFAULT_TYPE, [ { Ip, Port } ], ?DEFAULT_OPTIONS).
+%% kind of hard coding text and binary as the only options here
+open(Con, Hosts, [ Type ]) when is_pid(Con) and is_list(Hosts) ->
+	ok = verify_hosts(Hosts),
+	[ memcache:connect(Con, { Ip, Port }, [ Type ]) || { Ip, Port } <- Hosts ],
+	Con.
 
-open( Type, Ip, Port, Options ) when is_atom(Type) and is_list(Ip) and is_integer(Port) and is_list(Options) ->
-  open( Type, [ { Ip, Port } ], Options ).
+connect(Con, { Ip, Port }, [Type]) ->
+	memcache_cluster:connect(Con, Type, Ip, Port).
 
-open( Ip, Port, Options ) when is_list(Ip) and is_integer(Port) and is_list(Options) ->
-  open( ?DEFAULT_TYPE, [ { Ip, Port } ], Options);
-open( Type, Ip, Port ) when is_atom(Type) and is_list(Ip) and is_integer(Port) ->
-  open( Type, [ { Ip, Port } ], ?DEFAULT_OPTIONS );
-open( Type, Hosts, Options) when is_atom(Type) and is_list(Hosts) and is_list(Options) ->
-  Cluster = memcache_cluster:start(),
-  io:format("HOSTS ~p~n",[Hosts]),
-%  io:format("~p~n",[[ Cluster ! { connect, Type, Host, Port } || { Host, Port } <- Hosts ]]),
-  io:format("~p~n",[[ memcache_cluster:connect(Cluster, Type, Host, Port) || { Host, Port } <- Hosts ]]),
-  Cluster.
+disconnect(Con, { Ip, Port }) ->
+	memcache_cluster:disconnect(Con, Ip, Port).
 
+close(Con) ->
+	memcache_cluster:close(Con).
+
+verify_hosts(Hosts) ->
+	%% man I love list comprehension
+	case [ { Ip, Port } || { Ip, Port } <- Hosts, is_integer(Port), is_list(Ip) ] of
+		Hosts -> 
+			io:format("Hosts ok"),
+			ok;
+		Good -> exit({ bad_hosts_args, Hosts -- Good })
+	end.
 
 request(Con, Request) ->
   Con ! { request, self(), Request },

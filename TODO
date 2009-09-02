@@ -1,5 +1,6 @@
-Clean up the open semantics.  they are broken
-Recover from broken connections
+How should the cache behave when there are no connections?
+How should the cache behave when one of the eonnections is bad
+
 binary norespond
 Multi-Get
 Binary Increment/Decrement Start+Delta

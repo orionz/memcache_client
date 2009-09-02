@@ -10,6 +10,8 @@
 
 -export([start/0]).
 -export([loop/1]).
+-export([close/1]).
+-export([disconnect/3]).
 -export([connect/4]).
 
 -define(GET, 0).
@@ -50,7 +52,7 @@
 
 start() ->
   spawn(memcache_cluster,loop,[{ [], cache_hash:empty()}]).
-
+	
 loop(Cons) when is_tuple(Cons) ->
   receive
     { raw , Pid, Opcode, Key, Data } ->
@@ -59,28 +61,40 @@ loop(Cons) when is_tuple(Cons) ->
     { request, Pid, Request } ->
       Pid ! { response, request( Cons, Request) },
       loop(Cons);
-    { connect, Pid, Type, Ip, Port } ->
-      C = start_connection(Type, { Ip, Port }),
-      Pid ! { connection, C },
-			{ ConList, ConHash } = Cons,
-      loop({ [ C | ConList ] , cache_hash:add(C, ConHash) });
+    { disconnect, Ip, Port } ->
+			loop(remove_cons(Cons, lookup_cons(Cons, Ip, Port)));
+    { connect, Type, Ip, Port } ->
+			loop(add_con(Cons, start_connection(Type, { Ip, Port })));
+    { close } ->
+			exit(0);
     Other ->
       exit({ bad_msg, Other})
   end.
 
+lookup_cons({ ConList, _ }, Ip, Port) ->
+	[ { T, I, P, S } || { T, I, P, S } <- ConList, I == Ip, P == Port ].
+
+add_con( { ConList, ConHash }, Con ) ->
+	{ [ Con | ConList ], cache_hash:add(Con, ConHash) }.
+
+remove_cons( { ConList, ConHash }, [] ) ->
+	{ ConList, ConHash };
+remove_cons( { ConList, ConHash }, [ Con | Tail ] ) ->
+	remove_cons({ lists:delete(Con, ConList),  cache_hash:remove(Con, ConHash) }, Tail).
+
 %% Tasks:
-%%  x write a memcache client
-%%    write a memcache server
-%%    link the server to the client
 %%    route based on prefix
 %%    AMQP -> Clouds
 %%    Synch new cluster members on exact time
 
-connect(Cons, Type, Ip, Port) ->
-  Cons ! { connect, self(), Type, Ip, Port },
-  receive
-    { connection, C } -> C
-  end.
+close(Con) ->
+	Con ! { close }.
+
+connect(Con, Type, Ip, Port) ->
+  Con ! { connect, Type, Ip, Port }.
+
+disconnect(Con, Ip, Port) ->
+  Con ! { disconnect, Ip, Port }.
 
 start_connection(binary, { Host, Port } ) ->
   case gen_tcp:connect(Host, Port, ?TCP_BINARY_OPTIONS) of
@@ -107,6 +121,4 @@ request({ ConList, _ }, R) when (R#request.opcode == ?FLUSH) or (R#request.opcod
 	[ C:send_request(R) || C <- ConList ];
 request( { _, ConHash }, R) ->
   (cache_hash:lookup(R#request.key, ConHash)):send_request(R).
-%request( { [C|_], _ConHash }, R) ->
-%  C:send_request(R).
 

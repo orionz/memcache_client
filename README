@@ -31,22 +31,27 @@ coerce the text interface to work with it.
 Use:
 
   % this connects to localhost:11211 using the text protocol
-  Cache = memcache:open() 
+  Cache = memcache:open().
 
   % this connects to 10.0.0.1:11211 using the text protocol
-  Cache = memcache:open("10.0.0.1") 
+  Cache = memcache:open([{ "10.0.0.1", 11211}], [text]).
 
-  % this connects to 10.0.0.1:9999 using the text protocol
-  Cache = memcache:open("10.0.0.1",9999) 
-
-  % this connects to 10.0.0.1:9999 using the binary protocol
-  Cache = memcache:open(binary,"10.0.0.1",9999) 
+  % this connects to 10.0.0.1:11211 using the binary protocol
+  Cache = memcache:open([{ "10.0.0.1", 11211}], [binary]).
 
   % this connects to both 127.0.0.1:11211 and 10.0.0.1:9999 using the binary protocol
-  Cache = memcache:open(binary,[ "127.0.0.1" , { "10.0.0.1",9999 } ]) 
+  Cache = memcache:open([{"127.0.0.1", 11211}, {"10.0.0.1",9999}], [ binary ]).
+
+	% this adds a new cache to the connection pool
+  memcache:connect(Cache, {"10.0.0.100", 11211}, [binary]).
+
+	% this removes a cache from the connection pool
+  memcache:disconnect(Cache, {"10.0.0.1", 11211} ).
+
+	% this terminates the connection pool
+  memcache:close(Cache).
 
   % it is possible to have a heterogenius mix of binary and text connections
-  % but I have not writen a function for doing that
 
   memcache:set(Cache, Key, Value).
   memcache:set(Cache, Key, Value, Flags, Expire).

@@ -10,55 +10,17 @@
 -define(FAST, true).
 %-define(SLUG_SIZE, 10).
 %-define(NUM_TESTS, 10000).
--define(DEFAULT_PORT, 11211).
+-define(DEFAULT_CACHE, [{ "127.0.0.1", 11211 }] ).
 
--export([test/0,test_mnemosyne/0,benchmark/1]).
+-export([test/0]).
 
 test() ->
   inets:start(),
-  Cache = memcache:open(text,"127.0.0.1",?DEFAULT_PORT),
+  Cache = memcache:open( ?DEFAULT_CACHE, [ text ]),
   test(Cache,"Text Test"),
-  BinCache = memcache:open(binary,"127.0.0.1",?DEFAULT_PORT),
+  BinCache = memcache:open( ?DEFAULT_CACHE, [ binary ]),
   test(BinCache,"Binary Test"),
   ok.
-
-test_mnemosyne() ->
-  inets:start(),
-  io:format("connecting to mnemosyne/bin\n"),
-%  BinCache = memcache:open(binary,"127.0.0.1",?DEFAULT_PORT),
-%  io:format("set -> k1\n"),
-%  memcache:set(BinCache, "k1", "xxxyyyzzz"),
-%  io:format("get -> k1\n"),
-%  io:format("connecting to mnemosyne/text\n"),
-%  {ok,<<"xxxyyyzzz">>,_,_} = memcache:get(BinCache,"k1"),
-  Cache = memcache:open(text,"127.0.0.1",?DEFAULT_PORT),
-  io:format("set -> k1\n"),
-  memcache:set(Cache, "k1", "xxxyyyzzz"),
-  io:format("get -> k1\n"),
-  {ok,<<"xxxyyyzzz">>,_,_} = memcache:get(Cache,"k1"),
-  io:format("All done!\n"),
-  ok.
-
-benchmark(Type) ->
-  inets:start(),
-%  Cache = Cache = memcache:open(Type,"127.0.0.1",?DEFAULT_PORT),
-  Cache = Cache = memcache:open(Type,"127.0.0.1",?DEFAULT_PORT),
-  loop(Cache, 0, data()),
-  ok.
-
-data() ->
-  data(0,[]).
-data(?SLUG_SIZE,List) ->
-  list_to_binary(List);
-data(N,List) ->
-  data(N+1,[ "x" | List ]).
-
-loop(_Cache, ?NUM_TESTS, _Data) ->
-  ok;
-loop(Cache, Num, Data) ->
-  Cache:set("Hello", Data),
-  Cache:get("Hello"),
-  loop(Cache, Num+1, Data).
 
 test(C,TestName) ->
   io:format("-----------------------------------------\n"),
