@@ -29,16 +29,21 @@ send_request(R) ->
   write(R).
 
 read_line() ->
-  Line = read_line([]),
-  Line.
+  inet:setopts(Socket, [{packet, line}]),
+  case gen_tcp:recv(Socket, 0) of
+    {ok, Line} ->
+      %io:format("Line: ~p~n",[Line]),
+      inet:setopts(Socket, [{packet, raw}]),
+      binary_to_list(chomp(Line));
+    _ ->
+      exit(normal)
+  end.
 
-read_line(Line) ->
-  case recv(1) of
-    <<"\n">> ->
-      [ _ | Rest ] = Line,
-      lists:reverse( Rest );
-    <<Char>> ->
-      read_line([ Char | Line ])
+chomp(Line) when is_binary(Line) ->
+  Size = size(Line) - 2,
+  case Line of
+    <<Chunk:Size/binary,"\r\n">> -> Chunk;
+    _ -> Line
   end.
 
 words(Line) ->
