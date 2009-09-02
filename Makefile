@@ -9,3 +9,4 @@ test:
 
 clean:
 	(cd src;$(MAKE) clean)
+	rm -rf ebin

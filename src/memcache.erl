@@ -57,38 +57,35 @@
 
 new() ->
   memcache_cluster:start().
-	
+
 open() ->
   open( [ { ?DEFAULT_IP, ?DEFAULT_PORT } ], ?DEFAULT_OPTIONS ).
 
 open(Host, Options) when is_tuple(Host) ->
-	open([ Host ], Options);
+  open([ Host ], Options);
 open(Hosts, Options ) when is_list(Hosts) and is_list(Options) ->
-	memcache:open(memcache:new(), Hosts, Options).
+  memcache:open(memcache:new(), Hosts, Options).
 
 %% kind of hard coding text and binary as the only options here
 open(Con, Hosts, [ Type ]) when is_pid(Con) and is_list(Hosts) ->
-	ok = verify_hosts(Hosts),
-	[ memcache:connect(Con, { Ip, Port }, [ Type ]) || { Ip, Port } <- Hosts ],
-	Con.
+  ok = verify_hosts(Hosts),
+  [ memcache:connect(Con, { Ip, Port }, [ Type ]) || { Ip, Port } <- Hosts ],
+  Con.
 
 connect(Con, { Ip, Port }, [Type]) ->
-	memcache_cluster:connect(Con, Type, Ip, Port).
+  memcache_cluster:connect(Con, Type, Ip, Port).
 
 disconnect(Con, { Ip, Port }) ->
-	memcache_cluster:disconnect(Con, Ip, Port).
+  memcache_cluster:disconnect(Con, Ip, Port).
 
 close(Con) ->
-	memcache_cluster:close(Con).
+  memcache_cluster:close(Con).
 
 verify_hosts(Hosts) ->
-	%% man I love list comprehension
-	case [ { Ip, Port } || { Ip, Port } <- Hosts, is_integer(Port), is_list(Ip) ] of
-		Hosts -> 
-			io:format("Hosts ok"),
-			ok;
-		Good -> exit({ bad_hosts_args, Hosts -- Good })
-	end.
+  case [ { Ip, Port } || { Ip, Port } <- Hosts, is_integer(Port), is_list(Ip) ] of
+    Hosts -> ok;
+    Good -> exit({ bad_hosts_args, Hosts -- Good })
+  end.
 
 request(Con, Request) ->
   Con ! { request, self(), Request },
@@ -179,14 +176,14 @@ raw(Con, Opcode, Key, Data) ->
 flush(Con) when is_pid(Con)->
   flush(Con, 0).
 flush(Con, Exp) ->
-	[
-		case Request of
-			{ ok, _ } -> ok;
-			{ error, Error } -> { error, Error }
-		end
-		||
-		Request <- request( Con, #request{ opcode=?FLUSH, expires=Exp } )
-	].
+  [
+    case Request of
+      { ok, _ } -> ok;
+      { error, Error } -> { error, Error }
+    end
+    ||
+    Request <- request( Con, #request{ opcode=?FLUSH, expires=Exp } )
+  ].
 
 noop(Con) ->
   case request( Con, #request{ opcode=?NOOP } ) of
@@ -196,13 +193,13 @@ noop(Con) ->
 
 version(Con) ->
   [
-		case Response of
-			{ ok, [ Version, _, _, _ ] } -> { ok, Version };
-	    { error, Error } -> { error, Error }
+    case Response of
+      { ok, [ Version, _, _, _ ] } -> { ok, Version };
+      { error, Error } -> { error, Error }
     end
-		||
-		Response <- request( Con, #request{ opcode=?VERSION } )
-	].
+    ||
+    Response <- request( Con, #request{ opcode=?VERSION } )
+  ].
 
 stat(Con) ->
   request( Con, #request{ opcode=?STAT } ).

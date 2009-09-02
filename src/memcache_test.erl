@@ -4,12 +4,8 @@
 -define(TCP_TEXT_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
 -define(UDP_OPTIONS, [binary, {active, false} ]).
 
--define(SLUG_SIZE, 1024 * 1023).
--define(NUM_TESTS, 1000).
-
 -define(FAST, true).
-%-define(SLUG_SIZE, 10).
-%-define(NUM_TESTS, 10000).
+%-define(DEFAULT_CACHE, [{ "127.0.0.1", 11211 }, { "127.0.0.1", 9999 }] ).
 -define(DEFAULT_CACHE, [{ "127.0.0.1", 11211 }] ).
 
 -export([test/0]).
@@ -27,13 +23,13 @@ test(C,TestName) ->
   io:format("Testing: ~p~n",[TestName]),
   io:format("On connection: ~p~n",[C]),
 
-  [ { ok, Version } ] = memcache:version(C),
+  [ { ok, Version } | _ ] = memcache:version(C),
   io:format("Memcache V:~p~n",[ binary_to_list(Version) ]),
 
-  [ Stat ] = memcache:stat(C),
+  [ Stat | _ ] = memcache:stat(C),
   io:format("stat(pid) -> ~p~n",[lists:keysearch("pid",1,Stat)]),
 
-  [ ok ] = memcache:flush(C),
+  [ ok | _ ] = memcache:flush(C),
 
   io:format("get -> key_not_found~n"),
   {error, key_not_found} = memcache:get(C,"k1"),
@@ -109,7 +105,7 @@ test(C,TestName) ->
   { ok, <<"v4.1">>, _, _ } = memcache:get(C,"k1"),
 
   io:format("flush -> ok~n"),
-  [ ok ] = memcache:flush(C),
+  [ ok | _ ] = memcache:flush(C),
 
   io:format("get -> key_not_found~n"),
   {error,key_not_found} = memcache:get(C,"k1"),
@@ -120,19 +116,19 @@ test(C,TestName) ->
   io:format("get w/ flags -> ok~n"),
   { ok, <<"v1">>, 1234, _ } = memcache:get(C,"k1"),
 
-	case ?FAST of
-		true -> ok;
-		false ->
-			io:format("set w/ expire -> ok~n"),
-			memcache:set(C,"k1","v1",0,1),
+  case ?FAST of
+    true -> ok;
+    false ->
+      io:format("set w/ expire -> ok~n"),
+      memcache:set(C,"k1","v1",0,1),
 
-			io:format("get under expire -> ok~n"),
-			{ ok, <<"v1">>, _, _ } = memcache:get(C,"k1"),
+      io:format("get under expire -> ok~n"),
+      { ok, <<"v1">>, _, _ } = memcache:get(C,"k1"),
 
-			io:format("get over expire -> ok~n"),
-			timer:sleep(2000),
-			{error,key_not_found} = memcache:get(C,"k1")
-	end,
+      io:format("get over expire -> ok~n"),
+      timer:sleep(2000),
+      {error,key_not_found} = memcache:get(C,"k1")
+  end,
 
   io:format("set -> ok~n"),
   memcache:set(C,"k1","00"),
@@ -156,6 +152,8 @@ test(C,TestName) ->
 
   io:format("decrement -> ok~n"),
   { ok, 105 } = memcache:decrement(C,"III",5),
+
+  memcache:close(C),
 
   io:format("----------- DONE! -----------~n").
 

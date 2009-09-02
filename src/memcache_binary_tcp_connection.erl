@@ -53,14 +53,14 @@ send_request(R) ->
   read().
 
 read_stats(Stats) ->
-	case(read()) of
-		{ ok, [ <<>>, <<>>, _, _ ] } -> 
-			lists:reverse(Stats);
-		{ ok, [ Value, Key, _, _ ] } -> 
-			read_stats([ { binary_to_list(Key), binary_to_list(Value) } | Stats]);
-		Error ->
-			Error
-	end.
+  case(read()) of
+    { ok, [ <<>>, <<>>, _, _ ] } ->
+      lists:reverse(Stats);
+    { ok, [ Value, Key, _, _ ] } ->
+      read_stats([ { binary_to_list(Key), binary_to_list(Value) } | Stats]);
+    Error ->
+      Error
+  end.
 
 gen_extras(R) ->
   case R#request.opcode of
@@ -78,18 +78,18 @@ write(R) ->
   KeyLength = l(R#request.key),
   ExtrasLength = l(Extras),
   TotalBodyLength = KeyLength + ExtrasLength + l(R#request.value),
-  Command = [ 
-    <<128>>, 
-    <<(R#request.opcode):8>>, 
-    <<KeyLength:16>>, 
+  Command = [
+    <<128>>,
+    <<(R#request.opcode):8>>,
+    <<KeyLength:16>>,
     <<ExtrasLength:8>>,
-    <<(R#request.data_type):8>>, 
-    <<(R#request.reserved):16>>, 
-    <<TotalBodyLength:32>>, 
-    <<(R#request.opaque):32>>, 
-    <<(R#request.cas):64>>, 
+    <<(R#request.data_type):8>>,
+    <<(R#request.reserved):16>>,
+    <<TotalBodyLength:32>>,
+    <<(R#request.opaque):32>>,
+    <<(R#request.cas):64>>,
     Extras,
-    R#request.key, 
+    R#request.key,
     R#request.value ],
   send(Command).
 
@@ -106,7 +106,7 @@ read() ->
   <<129,_Opcode:8,_KeyLength:16,ExtrasLength:8,_DataType:8,Status:16,_TotalBodyLength:32,_Opaque:32,Cas:64>> = Head,
   ExtrasBits = ExtrasLength * 8,
   <<Extras:ExtrasBits>> = ExtrasBin,
-  case Status of 
+  case Status of
     0 -> { ok, [ Value, Key, Extras, Cas ] };
     1 -> { error, key_not_found };
     2 -> { error, key_exists };

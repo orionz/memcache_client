@@ -34,10 +34,10 @@ read_line() ->
 
 read_line(Line) ->
   case recv(1) of
-    <<"\n">> -> 
+    <<"\n">> ->
       [ _ | Rest ] = Line,
       lists:reverse( Rest );
-    <<Char>> ->  
+    <<Char>> ->
       read_line([ Char | Line ])
   end.
 
@@ -54,8 +54,8 @@ write(_R=#request{ opcode=?VERSION }) ->
     Error -> { error, Error }
   end;
 write(_R=#request{ opcode=?STAT }) ->
-	send("stats\r\n"),
-	read_stats([]);
+  send("stats\r\n"),
+  read_stats([]);
 write(R=#request{ opcode=?FLUSH }) ->
   send(["flush_all ", integer_to_list(R#request.expires), "\r\n"]),
   case read_line() of
@@ -142,12 +142,12 @@ raw(Data) ->
 % ...
 % END\r\n
 read_stats(Stats) ->
-	case words(read_line()) of
-		[ "END" ] -> 
-			lists:reverse(Stats);
-		[ "STAT", Key, Value ] -> 
-			read_stats([ { Key, Value } | Stats ])
-	end.
+  case words(read_line()) of
+    [ "END" ] ->
+      lists:reverse(Stats);
+    [ "STAT", Key, Value ] ->
+      read_stats([ { Key, Value } | Stats ])
+  end.
 
 raw_read() ->
   Line = read_line(),
@@ -156,7 +156,7 @@ raw_read() ->
       %%  <<"\r\nEND\r\n">>
       Line ++ "\r\n" ++ recv(list_to_integer(Bytes)+7);
     _ ->
-			Line ++ "\r\n"
+      Line ++ "\r\n"
   end.
 
 recv(0) ->

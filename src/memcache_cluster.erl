@@ -52,7 +52,7 @@
 
 start() ->
   spawn(memcache_cluster,loop,[{ [], cache_hash:empty()}]).
-	
+
 loop(Cons) when is_tuple(Cons) ->
   receive
     { raw , Pid, Opcode, Key, Data } ->
@@ -62,25 +62,26 @@ loop(Cons) when is_tuple(Cons) ->
       Pid ! { response, request( Cons, Request) },
       loop(Cons);
     { disconnect, Ip, Port } ->
-			loop(remove_cons(Cons, lookup_cons(Cons, Ip, Port)));
+      loop( remove_cons( Cons, lookup_cons( Cons, Ip, Port)));
     { connect, Type, Ip, Port } ->
-			loop(add_con(Cons, start_connection(Type, { Ip, Port })));
-    { close } ->
-			exit(0);
+      loop(add_con(Cons, start_connection(Type, { Ip, Port })));
+    { close, Pid } ->
+      Pid ! { closed },
+      exit(0);
     Other ->
       exit({ bad_msg, Other})
   end.
 
 lookup_cons({ ConList, _ }, Ip, Port) ->
-	[ { T, I, P, S } || { T, I, P, S } <- ConList, I == Ip, P == Port ].
+  [ { T, I, P, S } || { T, I, P, S } <- ConList, I == Ip, P == Port ].
 
 add_con( { ConList, ConHash }, Con ) ->
-	{ [ Con | ConList ], cache_hash:add(Con, ConHash) }.
+  { [ Con | ConList ], cache_hash:add(Con, ConHash) }.
 
 remove_cons( { ConList, ConHash }, [] ) ->
-	{ ConList, ConHash };
+  { ConList, ConHash };
 remove_cons( { ConList, ConHash }, [ Con | Tail ] ) ->
-	remove_cons({ lists:delete(Con, ConList),  cache_hash:remove(Con, ConHash) }, Tail).
+  remove_cons({ lists:delete(Con, ConList),  cache_hash:remove(Con, ConHash) }, Tail).
 
 %% Tasks:
 %%    route based on prefix
@@ -88,7 +89,10 @@ remove_cons( { ConList, ConHash }, [ Con | Tail ] ) ->
 %%    Synch new cluster members on exact time
 
 close(Con) ->
-	Con ! { close }.
+  Con ! { close, self() },
+  receive
+    { closed } -> ok
+  end.
 
 connect(Con, Type, Ip, Port) ->
   Con ! { connect, Type, Ip, Port }.
@@ -112,13 +116,13 @@ start_connection(text, { Host, Port }) ->
   end.
 
 raw({ ConList, _ }, Opcode, _Key, Data) when (Opcode == ?STAT) or (Opcode == ?FLUSH) ->
-	[ C:raw(Data) || C <- ConList  ];
+  [ C:raw(Data) || C <- ConList  ];
 raw({ _, ConHash }, _Opcode, Key, Data) ->
   (cache_hash:lookup(Key, ConHash)):raw(Data).
 
 %% requests with no key size (like FLUSH) should be sent to all backends - but need only return one response
 request({ ConList, _ }, R) when (R#request.opcode == ?FLUSH) or (R#request.opcode == ?STAT) or (R#request.opcode == ?VERSION) ->
-	[ C:send_request(R) || C <- ConList ];
+  [ C:send_request(R) || C <- ConList ];
 request( { _, ConHash }, R) ->
   (cache_hash:lookup(R#request.key, ConHash)):send_request(R).
 
