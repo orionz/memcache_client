@@ -5,14 +5,16 @@
 
 -export([add/3,add/5,replace/3,replace/5,set/3,set/5,set/6,cas/4,cas/6]).
 -export([addq/3,addq/5,replaceq/3,replaceq/5,setq/3,setq/5,setq/6,casq/4,casq/6]).
--export([get/2,getk/2]).
+-export([get/2,getk/2,mget/2,mgetk/2]).
 -export([delete/2,quit/1,flush/1,flush/2,noop/1,version/1,stat/1]).
 -export([deleteq/2,quitq/1,flushq/1,flushq/2]).
 -export([raw/4]).
 -export([append/3,prepend/3]).
 -export([appendq/3,prependq/3]).
 -export([increment/3,decrement/3]).
+-export([increment/4,decrement/4]).
 -export([incrementq/3,decrementq/3]).
+-export([incrementq/4,decrementq/4]).
 
 %-define(TCP_BINARY_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
 %-define(TCP_TEXT_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
@@ -167,6 +169,12 @@ getk(Con, Key) ->
     { error, Error } -> { error, Error }
   end.
 
+mget(Con, Keys) when is_list(Keys)->
+  { ok, [ { Value, Flags, Cas } || { ok, [ Value, _, Flags, Cas ] } <- request(Con, #request{ opcode=?GET, key=Keys, num_keys=length(Keys) } ) ] }.
+
+mgetk(Con, Keys) when is_list(Keys)->
+  { ok, [ { Key2, Value, Flags, Cas } || { ok, [ Value, Key2, Flags, Cas ] } <- request( Con, #request{ opcode=?GETK, key=Keys, num_keys=length(Keys)} ) ] }.
+
 delete(Con, Key) ->
   case request( Con, #request{ opcode=?DELETE, key=Key } ) of
     { ok, _ } -> ok;
@@ -234,25 +242,32 @@ stat(Con) ->
 %% increment(Key,Delta,Initial,Expires) -> initial and expires is only on binary protocol
 %  case request( #request{ opcode=?INCREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
 increment(Con, Key, Delta) ->
-  case request( Con, #request{ opcode=?INCREMENT, key=Key, delta=Delta } ) of
+  increment(Con, Key, 0, Delta).
+increment(Con, Key, Initial, Delta) ->
+  case request( Con, #request{ opcode=?INCREMENT, key=Key, delta=Delta, initial=Initial } ) of
     { ok, [ <<Value:64>> | _ ] } -> { ok, Value };
     { error, Error } -> { error, Error }
   end.
 
 incrementq(Con, Key, Delta) ->
-  request( Con, #request{ opcode=?INCREMENTQ, key=Key, delta=Delta } ),
+  incrementq(Con, Key, 0, Delta).
+incrementq(Con, Key, Initial, Delta) ->
+  request( Con, #request{ opcode=?INCREMENTQ, key=Key, delta=Delta, initial=Initial } ),
   ok.
 
 %decrement(Key,Delta,Initial,Expires) ->
 %  case request( #request{ opcode=?DECREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
-decrement(Con, Key,Delta) ->
-  case request( Con, #request{ opcode=?DECREMENT, key=Key, delta=Delta } ) of
+decrement(Con, Key, Delta) ->
+  decrement(Con, Key, 0, Delta).
+decrement(Con, Key, Initial, Delta) ->
+  case request( Con, #request{ opcode=?DECREMENT, key=Key, delta=Delta, initial=Initial } ) of
     { ok, [ <<Value:64>> | _ ] } -> { ok, Value };
     { error, Error } -> { error, Error }
   end.
 
-decrementq(Con, Key,Delta) ->
-  request( Con, #request{ opcode=?DECREMENTQ, key=Key, delta=Delta } ),
+decrementq(Con, Key, Delta) ->
+  decrementq(Con, Key, 0, Delta).
+decrementq(Con, Key, Initial, Delta) ->
+  request( Con, #request{ opcode=?DECREMENTQ, key=Key, delta=Delta, initial=Initial } ),
   ok.
-
 

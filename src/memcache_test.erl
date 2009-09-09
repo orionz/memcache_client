@@ -5,7 +5,6 @@
 -define(UDP_OPTIONS, [binary, {active, false} ]).
 
 -define(FAST, true).
-%-define(DEFAULT_CACHE, [{ "127.0.0.1", 11211 }, { "127.0.0.1", 9999 }] ).
 -define(DEFAULT_CACHE, [{ "127.0.0.1", 11211 }] ).
 
 -export([test/0]).
@@ -19,7 +18,7 @@ test() ->
   ok.
 
 test(C,TestName) ->
-  io:format("-----------------------------------------\n"),
+  io:format("----------------- START -----------------\n"),
   io:format("Testing: ~p~n",[TestName]),
   io:format("On connection: ~p~n",[C]),
 
@@ -53,7 +52,14 @@ test(C,TestName) ->
   io:format("set -> ok~n"),    memcache:set(C,"KEY009","v1"),
   io:format("get -> value~n"), { ok, <<"v1">>, _, _} = memcache:get(C,"KEY009"),
 
-  io:format("NOREPLY BATTERY --- ~n"),
+  io:format("mgetk -> value~n"),
+  {ok,[
+  {<<"KEY001">>,<<"v1">>,_,_},
+  {<<"KEY002">>,<<"v1">>,_,_},
+  {<<"KEY003">>,<<"v1">>,_,_},
+  {<<"KEY009">>,<<"v1">>,_,_}]} = memcache:mgetk(C,[ "FOOBAR", "KEY001", "KEY002", "KEY003", "KEY009" ]),
+
+  %% --- NOREPLY BATTERY ---
 
   memcache:flushq(C),
 
@@ -245,7 +251,12 @@ test(C,TestName) ->
   io:format("decrement -> ok~n"),
   { ok, 105 } = memcache:decrement(C,"III",5),
 
+  io:format("increment -> ok~n"),
+  { ok, 12 } = memcache:increment(C,"XIII", 12, 2),
+  io:format("increment -> ok~n"),
+  { ok, 14 } = memcache:increment(C,"XIII", 12, 2),
+
   memcache:close(C),
 
-  io:format("----------- DONE! -----------~n").
+  io:format("----------------- DONE! -----------------\n").
 

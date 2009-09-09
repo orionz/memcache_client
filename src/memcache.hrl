@@ -9,6 +9,7 @@
     expires=0,
     delta=0,
     initial=0,
+    num_keys=1,
     key = <<"">>,
     value = <<"">>
   }).

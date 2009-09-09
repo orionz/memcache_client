@@ -39,17 +39,24 @@ write(R=#request{ opcode=?GET }) ->
 write(R=#request{ opcode=?GETK }) ->
   base_get(R);
 write(R=#request{ opcode=?SET }) when R#request.cas > 0 ->
-  base_set("cas",R);
+  base_set("cas", R);
 write(R=#request{ opcode=?SET }) ->
-  base_set("set",R);
+  base_set("set", R);
 write(R=#request{ opcode=?REPLACE }) ->
-  base_set("replace",R);
+  base_set("replace", R);
 write(R=#request{ opcode=?ADD }) ->
-  base_set("add",R);
+  base_set("add", R);
 write(R=#request{ opcode=?APPEND }) ->
-  base_set("append",R);
+  base_set("append", R);
 write(R=#request{ opcode=?PREPEND }) ->
-  base_set("prepend",R);
+  base_set("prepend", R);
+write(R) when R#request.initial > 0 ->  %% only increment and decrement
+  case write( R#request{ opcode=?ADD, value=integer_to_list(R#request.initial) }) of
+    { ok, _ } ->
+      { ok, [ <<(R#request.initial):64>>, 0, 0, 0] };
+    _ ->
+      write(R#request { initial=0 })
+  end;
 write(R=#request{ opcode=?INCREMENT }) ->
   send(["incr ", R#request.key, " ", integer_to_list(R#request.delta), "\r\n"]),
   case read_line() of
@@ -69,17 +76,17 @@ write(R=#request{ opcode=?DELETE }) ->
     "NOT_FOUND" -> { error, key_not_found }
   end;
 write(R=#request{ opcode=?SETQ }) when R#request.cas > 0 ->
-  base_setq("cas",R);
+  base_setq("cas", R);
 write(R=#request{ opcode=?SETQ }) ->
-  base_setq("set",R);
+  base_setq("set", R);
 write(R=#request{ opcode=?REPLACEQ }) ->
-  base_setq("replace",R);
+  base_setq("replace", R);
 write(R=#request{ opcode=?ADDQ }) ->
-  base_setq("add",R);
+  base_setq("add", R);
 write(R=#request{ opcode=?APPENDQ }) ->
-  base_setq("append",R);
+  base_setq("append", R);
 write(R=#request{ opcode=?PREPENDQ }) ->
-  base_setq("prepend",R);
+  base_setq("prepend", R);
 write(R=#request{ opcode=?INCREMENTQ }) ->
   send(["incr ", R#request.key, " ", integer_to_list(R#request.delta), " noreply\r\n"]);
 write(R=#request{ opcode=?DECREMENTQ }) ->
@@ -91,7 +98,7 @@ write(R=#request{ opcode=?FLUSHQ }) ->
 write(_R=#request{ opcode=?VERSION }) ->
   send("version\r\n"),
   case read_words() of
-    [ "VERSION", V ] -> { ok, [ list_to_binary(V), 0, 0 ,0 ] };
+    [ "VERSION", V ] -> { ok, [ list_to_binary(V), 0, 0, 0 ] };
     Error -> { error, Error }
   end;
 write(_R=#request{ opcode=?STAT }) ->
@@ -103,6 +110,8 @@ write(R=#request{ opcode=?FLUSH }) ->
     "OK" -> { ok, [ 0, 0, 0, 0 ] };
     Error -> { error, Error }
   end;
+write(_R=#request{ opcode=?NOOP }) ->
+  { ok, not_implemented };
 write(_R=#request{ opcode=?QUITQ }) ->
   send("quit\r\n"),
   exit(normal);
@@ -110,7 +119,7 @@ write(_R=#request{ opcode=?QUIT }) ->
   send("quit\r\n"),
   exit(normal).
 
-base_get(R) ->
+base_get(R) when R#request.num_keys == 1 ->
   send(["gets ", R#request.key, "\r\n"]),
   case read_words() of
     [ "VALUE", Key, Flags, Bytes, Cas ] ->
@@ -121,14 +130,28 @@ base_get(R) ->
       end;
     [ "END" ] ->
       { error, key_not_found }
+  end;
+base_get(R) ->
+  send(["gets ", string:join(R#request.key," "), "\r\n"]),
+  read_many([]).
+
+read_many(T) ->
+  case read_words() of
+    [ "VALUE", Key, Flags, Bytes, Cas ] ->
+      Value = recv(list_to_integer(Bytes)),
+      read_many([ { ok, [ Value, list_to_binary(Key), list_to_integer(Flags), list_to_integer(Cas) ] } | T ]);
+    [ "END" ] ->
+      lists:reverse(T);
+    [] -> %% keep reading
+      read_many(T)
   end.
 
-base_setq(Cmd,R) ->
-  send([Cmd, " ", R#request.key, " ", integer_to_list(R#request.flags), " ", integer_to_list(R#request.expires), " ", integer_to_list(l(R#request.value)), cas_text(Cmd,R)," noreply\r\n", R#request.value, "\r\n"]).
+base_setq(Cmd, R) ->
+  send([Cmd, " ", R#request.key, " ", integer_to_list(R#request.flags), " ", integer_to_list(R#request.expires), " ", integer_to_list(l(R#request.value)), cas_text(Cmd, R)," noreply\r\n", R#request.value, "\r\n"]).
 
-base_set(Cmd,R) ->
+base_set(Cmd, R) ->
   %% this needs to send the cas value, duh
-  send([Cmd, " ", R#request.key, " ", integer_to_list(R#request.flags), " ", integer_to_list(R#request.expires), " ", integer_to_list(l(R#request.value)), cas_text(Cmd,R),"\r\n", R#request.value, "\r\n"]),
+  send([Cmd, " ", R#request.key, " ", integer_to_list(R#request.flags), " ", integer_to_list(R#request.expires), " ", integer_to_list(l(R#request.value)), cas_text(Cmd, R),"\r\n", R#request.value, "\r\n"]),
   case read_line() of
     "STORED"  -> { ok, [ 0, 0, 0, 0 ] };
     "NOT_STORED" -> { error, item_not_stored };
@@ -136,9 +159,9 @@ base_set(Cmd,R) ->
     "NOT_FOUND" -> { error, key_not_found }
   end.
 
-cas_text("cas",R) ->
+cas_text("cas", R) ->
   [" ", integer_to_list(R#request.cas) ];
-cas_text(_,_) ->
+cas_text(_, _) ->
   "".
 
 send(Data) ->
