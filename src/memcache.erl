@@ -16,9 +16,6 @@
 -export([incrementq/3,decrementq/3]).
 -export([incrementq/4,decrementq/4]).
 
-%-define(TCP_BINARY_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
-%-define(TCP_TEXT_OPTIONS, [binary, {packet, 0}, {active, false}, {reuseaddr, true}]).
-
 -include_lib("memcache.hrl").
 
 -define(DEFAULT_OPTIONS, [text]).
@@ -239,8 +236,6 @@ version(Con) ->
 stat(Con) ->
   request( Con, #request{ opcode=?STAT } ).
 
-%% increment(Key,Delta,Initial,Expires) -> initial and expires is only on binary protocol
-%  case request( #request{ opcode=?INCREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
 increment(Con, Key, Delta) ->
   increment(Con, Key, 0, Delta).
 increment(Con, Key, Initial, Delta) ->
@@ -255,8 +250,6 @@ incrementq(Con, Key, Initial, Delta) ->
   request( Con, #request{ opcode=?INCREMENTQ, key=Key, delta=Delta, initial=Initial } ),
   ok.
 
-%decrement(Key,Delta,Initial,Expires) ->
-%  case request( #request{ opcode=?DECREMENT, key=Key, delta=Delta, initial=Initial, expires=Expires } ) of
 decrement(Con, Key, Delta) ->
   decrement(Con, Key, 0, Delta).
 decrement(Con, Key, Initial, Delta) ->
