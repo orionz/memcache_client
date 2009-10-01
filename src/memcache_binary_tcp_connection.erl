@@ -92,24 +92,12 @@ read_responses(Opaque, Terminal, T) ->
       read_responses(Opaque, Terminal, T)
   end.
 
-raw(?STAT, Opaque, Data) ->
-  write(Data),
-  raw_read_stat(Opaque, []);
-raw(Opcode, _Opaque, Data) when (Opcode > ?STAT) or (Opcode == ?GETQ) or (Opcode == ?GETKQ) ->
-  write(Data);
+%% bxor?
+raw(Opcode, _Opaque, Data) when (Opcode > ?STAT) or (Opcode =:= ?GETQ) or (Opcode =:= ?GETKQ) ->
+  send(Data), [];
 raw(_Opcode, Opaque, Data) ->
-  write(Data),
-  raw_read_until_opaque(Opaque,[]).
-
-raw_read_stat(Opaque, T) ->
-  case raw_read() of
-    { ?STAT, 0, Opaque, Data } ->
-      case Data of
-        [ _, _, <<>>, <<>>] -> lists:reverse([ Data | T ]);
-        _ -> raw_read_stat(Opaque, [ Data | T ])
-      end;
-    { _, _, _, Data } -> raw_read_stat(Opaque, [ Data | T ])
-  end.
+  send(Data),
+  raw_read_until_opaque(Opaque, []).
 
 raw_read_until_opaque(Opaque, T) ->
   case raw_read() of

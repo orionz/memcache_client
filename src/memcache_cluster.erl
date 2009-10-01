@@ -19,9 +19,9 @@ start() ->
 
 loop(Cons) when is_tuple(Cons) ->
   receive
-    { raw , Pid, Opcode, Key, Data } ->
+    { raw , Pid, Opcode, Opaque, Key, Data } ->
 %      io:format("GOT RAW ~p,~p,~p~n",[Opcode,Key,Data]),
-      Pid ! { raw_response, raw( Cons, Opcode, Key, Data) },
+      Pid ! { raw_response, raw( Cons, Opcode, Opaque, Key, Data) },
       loop(Cons);
     { request, Pid, Request } ->
 %      io:format("GOT REQUEST ~p,~p~n",[Pid,Request]),
@@ -81,10 +81,12 @@ start_connection(text, { Host, Port }) ->
       { error, Reason }
   end.
 
-raw({ ConList, _ }, Opcode, _Key, Data) when (Opcode == ?STAT) or (Opcode == ?FLUSH) ->
-  [ C:raw(Data) || C <- ConList  ];
-raw({ _, ConHash }, _Opcode, Key, Data) ->
-  (cache_hash:lookup(Key, ConHash)):raw(Data).
+%% raw does not support stat or version
+%% flush's return value is to be ignored
+raw({ ConList, _ }, Opcode, Opaque, _Key, Data) when (Opcode == ?FLUSH) ->
+  lists:nth(1,[ C:raw(Opcode, Opaque, Data) || C <- ConList ]);
+raw({ _, ConHash }, Opcode, Opaque, Key, Data) ->
+  (cache_hash:lookup(Key, ConHash)):raw(Opcode, Opaque, Data).
 
 %% requests with no key size (like FLUSH) should be sent to all backends - but need only return one response
 request({ ConList, _ }, R) when (R#request.opcode == ?FLUSH) or (R#request.opcode == ?STAT) or (R#request.opcode == ?VERSION) ->

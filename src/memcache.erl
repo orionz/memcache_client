@@ -8,7 +8,7 @@
 -export([get/2,getk/2,mget/2,mgetk/2]).
 -export([delete/2,quit/1,flush/1,flush/2,noop/1,version/1,stat/1]).
 -export([deleteq/2,quitq/1,flushq/1,flushq/2]).
--export([raw/4]).
+-export([raw/5]).
 -export([append/3,prepend/3]).
 -export([appendq/3,prependq/3]).
 -export([increment/3,decrement/3]).
@@ -199,8 +199,8 @@ quitq(Con) ->
   request( Con, #request{ opcode=?QUITQ } ),
   ok.
 
-raw(Con, Opcode, Key, Data) ->
-  Con ! { raw, self(), Opcode, Key, Data },
+raw(Con, Opcode, Opaque, Key, Data) ->
+  Con ! { raw, self(), Opcode, Opaque, Key, Data },
   receive
     { raw_response, Response } ->
       Response
