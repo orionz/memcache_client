@@ -16,10 +16,12 @@ send_request(R) ->
 
 send_opaque_request(R) when R#request.opcode > ?STAT ->
   write(R);
-send_opaque_request(R) when R#request.opcode == ?STAT ->
+send_opaque_request(R) when R#request.opcode =:= ?STAT ->
   write(R),
   read_stats(R#request.opaque, []);
-send_opaque_request(R) when R#request.num_keys > 1->
+%% this  is a little screwy since text returns an array and this does not
+%send_opaque_request(R) when R#request.num_keys > 1->
+send_opaque_request(R) when (R#request.opcode =:= ?GET) or (R#request.opcode =:= ?GETK)->
   Terminal = gen_opaque(),
   many_write(R, Terminal, R#request.key),
   read_responses(R#request.opaque, Terminal, []);
@@ -76,10 +78,14 @@ read_response(Opaque) ->
 
 read_responses(Opaque, Terminal, T) ->
   case(H = read()) of
-    { _, _, _, _, _, _, Terminal } ->
+    { _, 0, _, _, _, _, Terminal } ->
       lists:reverse([ format_response(H) | T]);
-    { _, _, _, _, _, _, Opaque } ->
+    { _, _, _, _, _, _, Terminal } ->
+      lists:reverse(T);
+    { _, 0, _, _, _, _, Opaque } ->
       read_responses(Opaque, Terminal, [ format_response(H) | T ]);
+    { _, _, _, _, _, _, Opaque } ->
+      read_responses(Opaque, Terminal, T);
     _ ->
       %% async error from a previous silent command - error handler pid?
       io:format("asynch error ~p~n",[H]),

@@ -119,18 +119,9 @@ write(_R=#request{ opcode=?QUIT }) ->
   send("quit\r\n"),
   exit(normal).
 
-base_get(R) when R#request.num_keys == 1 ->
-  send(["gets ", R#request.key, "\r\n"]),
-  case read_words() of
-    [ "VALUE", Key, Flags, Bytes, Cas ] ->
-      Value = recv(list_to_integer(Bytes)),
-      case recv(7) of
-        <<"\r\nEND\r\n">> -> { ok, [ Value, list_to_binary(Key), list_to_integer(Flags), list_to_integer(Cas) ] };
-        Error -> { error, Error }
-      end;
-    [ "END" ] ->
-      { error, key_not_found }
-  end;
+%base_get(R) when R#request.num_keys =:= 1 ->
+%  send(["gets ", R#request.key, "\r\n"]),
+%  read_many([]);
 base_get(R) ->
   send(["gets ", string:join(R#request.key," "), "\r\n"]),
   read_many([]).

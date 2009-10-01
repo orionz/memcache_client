@@ -74,7 +74,9 @@ verify_hosts(Hosts) ->
 request(Con, Request) ->
   Con ! { request, self(), Request },
   receive
-    { response, Response } -> Response
+    { response, Response } -> 
+      io:format("REQUEST: got ~p~n",[Response]),
+      Response
   end.
 
 cas(Con, Key, Value, Cas) when is_integer(Cas) ->
@@ -155,14 +157,19 @@ prependq(Con, Key, Value) ->
   ok.
 
 get(Con, Key) ->
-  case request(Con, #request{ opcode=?GET, key=Key } ) of
-    { ok, [ Value, _, Flags, Cas ] } -> { ok, Value, Flags, Cas };
-    { error, Error } -> { error, Error }
+  case request(Con, #request{ opcode=?GET, key=[Key] } ) of
+    [{ ok, [ Value, _, Flags, Cas ] }] -> { ok, Value, Flags, Cas };
+%    { ok, [ Value, _, Flags, Cas ]} -> { ok, Value, Flags, Cas };
+    [] -> { error, key_not_found }
+%    [{ error, Error }] -> { error, Error };
+%    { error, Error } -> { error, Error }
   end.
 
 getk(Con, Key) ->
-  case request( Con, #request{ opcode=?GETK, key=Key } ) of
+  case request( Con, #request{ opcode=?GETK, key=[Key] } ) of
+    [{ ok, [ Value, Key2, Flags, Cas ] }] -> { ok, Key2, Value, Flags, Cas };
     { ok, [ Value, Key2, Flags, Cas ] } -> { ok, Key2, Value, Flags, Cas };
+    [{ error, Error }] -> { error, Error };
     { error, Error } -> { error, Error }
   end.
 
