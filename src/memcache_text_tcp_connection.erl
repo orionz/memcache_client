@@ -133,6 +133,8 @@ read_many(T) ->
       read_many([ { ok, [ Value, list_to_binary(Key), list_to_integer(Flags), list_to_integer(Cas) ] } | T ]);
     [ "END" ] ->
       lists:reverse(T);
+    [ "ERROR" ] ->
+      read_many(T);
     [] -> %% keep reading
       read_many(T)
   end.

@@ -89,8 +89,44 @@ raw({ _, ConHash }, Opcode, Opaque, Key, Data) ->
   (cache_hash:lookup(Key, ConHash)):raw(Opcode, Opaque, Data).
 
 %% requests with no key size (like FLUSH) should be sent to all backends - but need only return one response
-request({ ConList, _ }, R) when (R#request.opcode == ?FLUSH) or (R#request.opcode == ?STAT) or (R#request.opcode == ?VERSION) ->
+request({ ConList, _ }, R) when R#request.opcode == ?FLUSH; R#request.opcode == ?STAT; R#request.opcode == ?VERSION; R#request.opcode == ?FLUSHQ ->
   [ C:send_request(R) || C <- ConList ];
+request({ _, ConHash }, R) when R#request.opcode == ?GET; R#request.opcode == ?GETK ->  %% receives an array of keys
+  Cons = bucket([{ cache_hash:lookup(Key, ConHash), Key } || Key <- R#request.key ]),
+  case Cons of
+    [ { Con, _ } ] ->
+      Con:send_request(R);
+    Cons ->
+      order_results(R#request.key, [ Con:send_request(R#request{ key=KeySet, num_keys=length(KeySet) }) || { Con, KeySet } <- Cons ])
+  end;
 request( { _, ConHash }, R) ->
   (cache_hash:lookup(R#request.key, ConHash)):send_request(R).
+
+%% @@bucket - converts [ { key1, val1 }, { key1, val2 }, { key2, val3 }, ... ] into [ { key1, [ val1, val2 ] }, { key2, [ val3 ] },... ]
+bucket(Keys) ->
+  bucket([], lists:reverse(lists:keysort(1, Keys))).
+
+bucket(HT, []) ->
+  HT;
+bucket([{ HK, HL } | HT], [{ HK, HLNew } | T ]) ->
+  bucket([{ HK, [ HLNew | HL ] } | HT], T);
+bucket(HT, [{ HK, HLNew } | T ]) ->
+  bucket([{ HK, [ HLNew ] } | HT], T).
+
+order_results(Keys, Unordered) ->
+  order_results(Keys, lists:flatten(Unordered), [], []).
+
+order_results(_, [], Ordered, []) ->
+  lists:reverse(Ordered);
+order_results([ _Key | KeyT ], [], Ordered, Sidebar) ->
+  order_results(KeyT, Sidebar, Ordered, []);
+order_results(Keys, [ { error, Error } | NewT  ], Ordered, Sidebar) ->
+  order_results(Keys, NewT, [ { error, Error } | Ordered ], Sidebar);
+order_results(Keys = [ Key | KeyT], News = [ New | NewT  ], Ordered, Sidebar) ->
+  io:format("~p,~p,~p,~p~n",[Keys,News,Ordered,Sidebar]),
+  BKey = list_to_binary(Key),
+  case New of
+    { ok, [ _, BKey, _, _ ] } -> order_results(KeyT, NewT ++ Sidebar, [ New | Ordered ], []);
+    { ok, [ _, _, _, _ ] } -> order_results([ Key | KeyT ], NewT, Ordered, [ New | Sidebar ])
+  end.
 
